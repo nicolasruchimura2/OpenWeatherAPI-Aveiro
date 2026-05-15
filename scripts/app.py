@@ -26,7 +26,7 @@ def obter_clima_atual():
             }
         }
     ]
-
+    
     resultados = list(colecao.aggregate(pipeline))
     dados_finais = []
 
@@ -37,6 +37,26 @@ def obter_clima_atual():
 
     cliente.close()
     return jsonify(dados_finais)
+
+@app.route("/api/historico/<cidade>", methods=["GET"])
+def obter_historico(cidade):
+    cliente = MongoClient(MONGO_URI)
+    colecao = cliente["tabd_aveiro"]["historico_clima"]
+# Pipeline corre o historico das ultimas 24 leituras
+    pipeline = [
+        {"$match":{"cidade":cidade}},
+        {"$sort":{"data_hora":1}}, # 1 para ordem crescente (cronologica)
+        {"$limit":24} # maximo de horas
+    ]
+
+    historico = list(colecao.aggregate(pipeline))
+
+    for doc in historico:
+        doc["_id"] = str(doc["_id"])
+    cliente.close()
+    return jsonify(historico)
+
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

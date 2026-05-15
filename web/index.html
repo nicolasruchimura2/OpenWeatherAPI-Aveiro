@@ -6,26 +6,105 @@
     <title>Plataforma de Tempo - Aveiro</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; font-family: Arial, sans-serif; }
-        #header { background: #2c3e50; color: white; padding: 15px; text-align: center; }
-        #map { height: calc(100vh - 80px); width: 100%; }
+body { margin: 0; font-family: Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        #header { background: #2c3e50; color: white; padding: 15px; text-align: center; flex-shrink: 0; }
+        
+        /* Divisão do ecrã: Mapa à esquerda, Gráfico à direita */
+        #content-area { display: flex; flex-grow: 1; overflow: hidden; }
+        #map { width: 70%; height: 100%; border-right: 2px solid #ccc; }
+        #painel-grafico { width: 30%; height: 100%; padding: 20px; background-color: #f9f9f9; box-sizing: border-box; overflow-y: auto; }
+        
         .popup-custom { font-size: 14px; }
         .alerta-extremo { color: red; font-weight: bold; }
+        #mensagem-vazia { color: #7f8c8d; font-style: italic; text-align: center; margin-top: 50px; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div id="header"><h2>Monitorização Meteorológica em Tempo Real (Distrito de Aveiro)</h2></div>
-    <div id="map"></div>
+    <div id="content-area">
+        <div id="map"></div>
+        
+        <div id="painel-grafico">
+            <h3 id="titulo-grafico">Análise Histórica</h3>
+            <p id="mensagem-vazia">Clique numa cidade no mapa para ver a evolução da temperatura nas últimas 24 horas.</p>
+            <canvas id="graficoTemperatura" style="display: none;"></canvas>
+        </div>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
+
+    // Inicializa o mapa, a partir do Leaflet + .setView([40.6443, -8.5431], 10)        
         const map = L.map('map').setView([40.6443, -8.5431], 10)
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
             attribution: '@ OpenStreetMap contributers'
         }).addTo(map);
 
+        const grupoMarcadores = L.featureGroup().addTo(map);
         let marcadores = {};
+
+        let graficoInstancia = null;
+
+    // Funcao que busca o grafico e o desenha
+        async function carregarGrafico(cidade){
+            document.getElementById('mensagem-vazia').style.display='none';
+            document.getElementById('graficoTemperatura').style.display='block';
+            document.getElementById('titulo-grafico').innerText=`Histórico de Temperatura: ${cidade}`;
+
+            try {
+                const urlSegura=`http://127.0.0.1:5000/api/historico/${encodeURIComponent(cidade)}`;
+                const resposta = await fetch(urlSegura);
+
+                if(!resposta.ok){
+                    throw new Error(`Erro no servidor: ${resposta.status}`);
+                }
+
+                const dadosHistoricos = await resposta.json();
+                console.log("Dados recebidos de:", dadosHistoricos);
+
+                const rotulosTempo=[];
+                const dadosTemperatura=[];
+
+                dadosHistoricos.forEach(doc=>{
+                    const data = new Date(doc.data_hora);
+                    const horaFormatada = `${data.getHours()}h${data.getMinutes().toString().padStart(2,'0')}`;
+                    
+                    rotulosTempo.push(horaFormatada);
+                    dadosTemperatura.push(doc.clima.temperatura);
+                });
+
+                if(graficoInstancia){
+                    graficoInstancia.destroy(); //Simples destroy graph se ja houver um grafico da cidade
+                }
+
+                const ctx = document.getElementById('graficoTemperatura').getContext('2d');
+                graficoInstancia = new Chart(ctx, {
+                    type:'line',
+                    data: {
+                        labels:rotulosTempo,
+                        datasets: [{
+                            label: 'Temperatura (°C)',
+                            data:dadosTemperatura,
+                            borderColor:'#e74c3c',
+                            backgroundColor: 'rgba(231,76,60, 0.2)',
+                            borderWidth: 2,
+                            fill:true,
+                            tension:0.3
+                        }]
+                    },
+                    options:{
+                        responsive:true,
+                        plugins:{
+                            legend:{position:'bottom'}
+                        }
+                    }
+                });
+            } catch(erro){
+                console.error("Erro ao carregar os dados do grafico:", erro);
+            }
+        }
 
         async function atualizarMapa(){
             try{
@@ -51,10 +130,22 @@
                     if(marcadores[cidade]){
                         marcadores[cidade].setLatLng([lat, lon]).setPopupContent(conteudoPopup);
                     } else {
-                        const novoMarcador = L.marker([lat, lon]).addTo(map).bindPopup(conteudoPopup);
-                        marcadores[cidade] = novoMarcador;
+                        const novoMarcador = L.marker([lat, lon]).bindPopup(conteudoPopup);
+                        novoMarcador.on('popupopen',()=>{
+                            console.log(`A carregar dados para o grafico de: ${cidade}`);
+                            carregarGrafico(cidade);
+                        });
+                        novoMarcador.addTo(grupoMarcadores);
+                        marcadores[cidade]=novoMarcador;
                     }
                 });
+            /*
+            * Possibilita, para quando o array marcadores, que inclui as cidades de Aveiro escolhidas, for maior que 0, deve enquadrar (fit) todas as cidades grupoMarcadores.getBounds(), padding: [50,50]
+            */
+                if(Object.keys(marcadores).lenght>0){
+                    map.fitBounds(grupoMarcadores.getBounds(), {padding:[50,50]});
+                }
+
             } catch (erro) {
                 console.error("Erro ao puxar dados dos servidor backend . . .", erro);
             }

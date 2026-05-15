@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plataforma de Tempo - Aveiro</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; }
+        #header { background: #2c3e50; color: white; padding: 15px; text-align: center; }
+        #map { height: calc(100vh - 80px); width: 100%; }
+        .popup-custom { font-size: 14px; }
+        .alerta-extremo { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="header"><h2>Monitorização Meteorológica em Tempo Real (Distrito de Aveiro)</h2></div>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([40.6443, -8.5431], 10)
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+            attribution: '@ OpenStreetMap contributers'
+        }).addTo(map);
+
+        let marcadores = {};
+
+        async function atualizarMapa(){
+            try{
+                const resposta = await fetch('http://127.0.0.1:5000/api/clima')
+                const dados = await resposta.json();
+
+                dados.forEach(ponto=>{
+                    const lon = ponto.localizacao.coordinates[0];
+                    const lat = ponto.localizacao.coordinates[1];
+                    const cidade = ponto.cidade;
+
+                    let conteudoPopup = `
+                        <div class="popup-custom">
+                            <h3>${cidade}</h3>
+                            <p><b>Condição:</b> ${ponto.clima.condicao}</p>
+                            <p><b>Temperatura:</b> ${ponto.clima.temperatura}°C</p>
+                            <p><b>Humidade:</b> ${ponto.clima.humidade}%</p>
+                            <p><b>Vento:</b> ${ponto.clima.vento_velocidade} m/s</p>
+                            ${ponto.tempo_extremo ? '<p class="alerta-extremo">ALERTA: Tempo Extremo!</p>' : ''}
+                        </div>
+                    `;
+
+                    if(marcadores[cidade]){
+                        marcadores[cidade].setLatLng([lat, lon]).setPopupContent(conteudoPopup);
+                    } else {
+                        const novoMarcador = L.marker([lat, lon]).addTo(map).bindPopup(conteudoPopup);
+                        marcadores[cidade] = novoMarcador;
+                    }
+                });
+            } catch (erro) {
+                console.error("Erro ao puxar dados dos servidor backend . . .", erro);
+            }
+        }
+
+        atualizarMapa();
+        setInterval(atualizarMapa, 5000);
+    </script>
+</body>
+</html>

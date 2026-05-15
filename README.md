@@ -6,7 +6,7 @@ Camada de Ingestão (ingestion.py): Serviço autónomo em Python que consome a A
 
     Camada de Apresentação (Frontend - index.html): Painel analítico interativo (Dashboard) baseado em tecnologias web padrão que renderiza um mapa dinâmico e gráficos de linhas temporais.
 
-## Tecnologias Utilizadas
+# Tecnologias Utilizadas
 
     Python 3.11+: Utilizado pela sua robustez no ecossistema de dados e facilidade de integração com APIs externas.
 
@@ -18,7 +18,7 @@ Camada de Ingestão (ingestion.py): Serviço autónomo em Python que consome a A
 
     Chart.js: Motor gráfico em HTML5 Canvas, utilizado para renderizar tendências e séries temporais de forma limpa e responsiva.
 
-## Estrutura de Ficheiros
+# Estrutura de Ficheiros
 Plaintext
 
 projeto-tabd/
@@ -32,7 +32,7 @@ projeto-tabd/
     ├── ingestion.py           # Script de captura e população de dados no MongoDB
     └── app.py                 # Servidor Flask API Backend
 
-## Pormenores Críticos e Sintaxes com Atenção Especial
+# Pormenores Críticos e Sintaxes com Atenção Especial
 
 Vários detalhes técnicos e de sintaxe são cruciais para o funcionamento estável do ecossistema e constituem a base de diferenciação técnica para a defesa do projeto:
 1. Separação Estrita de Bibliotecas (Python Imports)
@@ -77,37 +77,37 @@ As cidades do distrito de Aveiro possuem caracteres acentuados e espaços (ex: �
 
 O Chart.js armazena instâncias de desenho no elemento <canvas>. Tentar criar um gráfico novo por cima de um ativo causa sobreposição de dados na memória gráfica, gerando falhas visuais. A variável global graficoInstancia verifica a existência prévia e limpa o gráfico antigo antes de instanciar o novo:
 JavaScript
-        ```
-            if (graficoInstancia) { graficoInstancia.destroy(); }
-        ```
-📈 Processamento Avançado: Pipelines de Agregação
+
+if (graficoInstancia) { graficoInstancia.destroy(); }
+
+ Processamento Avançado: Pipelines de Agregação
 
 Para justificar a complexidade académica exigida na cadeira, a API utiliza o framework de agregação nativo do MongoDB:
 Obtenção do Estado Atual (/api/clima)
 
 Utiliza um fluxo de ordenação inversa e agrupamento por cidade para extrair apenas a leitura mais recente de cada ponto geográfico, minimizando o tráfego de dados.
 Python
-        ```
-            pipeline = [
-                {"$sort": {"data_hora": -1}},
-                {"$group": {
-                    "_id": "$cidade",
-                    "dados_recentes": {"$first": "$$ROOT"}
-                }}
-            ]
-        ```
+
+pipeline = [
+    {"$sort": {"data_hora": -1}},
+    {"$group": {
+        "_id": "$cidade",
+        "dados_recentes": {"$first": "$$ROOT"}
+    }}
+]
+
 Histórico para o Gráfico (/api/historico/<cidade>)
 
 Filtra os dados pela cidade selecionada, ordena de forma cronológica ascendente para o gráfico desenhar a linha corretamente da esquerda para a direita, e limita o resultado aos últimos 24 registos (representando o ciclo do dia).
 Python
-        ```
-            pipeline = [
-                {"$match": {"cidade": cidade}},
-                {"$sort": {"data_hora": 1}},
-                {"$limit": 24}
-            ]
-        ```
-## Como Executar o Projeto
+
+pipeline = [
+    {"$match": {"cidade": cidade}},
+    {"$sort": {"data_hora": 1}},
+    {"$limit": 24}
+]
+
+# Como Executar o Projeto
 
     Instalar Dependências: No terminal, navegue até à pasta scripts/ e execute:
     Bash
